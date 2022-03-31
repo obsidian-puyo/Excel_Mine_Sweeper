@@ -1,0 +1,169 @@
+
+' === 定数定義 ===
+
+Private Const bombs As Integer = 15     ' 地雷の個数
+
+' === メソッド ===
+
+Private Sub ReStart()
+    
+    ' 値のクリア
+    Range("B2", "K11").ClearContents
+    ' 色の初期化
+    Range("B2", "K11").Interior.Color = RGB(200, 200, 200)
+    Range("B2", "K11").Font.Color = RGB(0, 0, 0)
+    
+    ' 初期配置
+    Call SetBomb
+    
+End Sub
+
+Private Sub SetBomb()
+    Dim i As Integer            ' 地雷数インクリメント
+    Dim rand_row As Integer     ' 行選定用
+    Dim rand_clm As Integer     ' 列選定用
+    
+    Dim idx_row As Integer      ' 行インクリメント
+    Dim idx_clm As Integer      ' 列インクリメント
+    
+    ' 地雷の配置処理
+    For i = 1 To bombs
+        rand_row = Int(Rnd() * 10) + 2
+        rand_clm = Int(Rnd() * 10) + 2
+        
+        If Cells(rand_row, rand_clm).Value = "" Then
+            Cells(rand_row, rand_clm).Value = "●"
+        Else
+            ' 同じ場所を引いた場合再抽選のためデクリメント
+            i = i - 1
+        End If
+    Next    'i
+    
+    ' 数字の配置処理
+    For idx_row = 2 To 11
+        For idx_clm = 2 To 11
+            Dim cnt As Integer  ' 地雷数カウント
+            Dim jdx_row As Integer
+            Dim jdx_clm As Integer
+            
+            ' 地雷のセルは処理を抜ける
+            If Cells(idx_row, idx_clm).Value = "●" Then
+                GoTo Continue1
+            End If
+            
+            ' カウント数初期化
+            cnt = 0
+            
+            ' カウント加算
+            For jdx_row = (idx_row - 1) To (idx_row + 1)
+                For jdx_clm = (idx_clm - 1) To (idx_clm + 1)
+                    If BombCount(jdx_row, jdx_clm) = True Then
+                        cnt = cnt + 1
+                    End If
+                Next    'jdx_clm
+            Next        'jdx_row
+            
+            ' 数値を配置
+            If cnt <> 0 Then
+                Cells(idx_row, idx_clm).Value = CStr(cnt)
+            End If
+        
+Continue1:          ' continueがないので仕方なくタグに飛ばす
+        Next    'idx_clm
+    Next        'idx_row
+    
+    ' セルの内容を非表示
+    Range("B2", "K11").NumberFormatLocal = ";;;"
+
+End Sub
+
+Private Function BombCount(ByVal p_row As Integer, ByVal p_column As Integer) As Boolean
+    If Cells(p_row, p_column).Value = "●" Then
+        BombCount = True
+    Else
+        BombCount = False
+    End If
+End Function
+
+Private Sub ClickFunction(ByVal p_row As Integer, ByVal p_clm As Integer)
+
+    If Cells(p_row, p_clm).Interior.Color = RGB(255, 255, 255) Then
+        Exit Sub
+    End If
+
+    If (p_row >= 2 And p_row <= 11) And _
+       (p_clm >= 2 And p_clm <= 11) Then
+       
+        ' セルの内容を表示
+        Cells(p_row, p_clm).Interior.Color = RGB(255, 255, 255)
+        Cells(p_row, p_clm).NumberFormatLocal = ""
+            
+        If Cells(p_row, p_clm).Value = "" Then
+            ' 空白のセルの場合、周りのセルを表示
+            Call ClickFunction(p_row - 1, p_clm - 1)    ' 左上
+            Call ClickFunction(p_row - 1, p_clm)        ' 上
+            Call ClickFunction(p_row - 1, p_clm + 1)    ' 右上
+            Call ClickFunction(p_row, p_clm - 1)        ' 左
+            Call ClickFunction(p_row, p_clm + 1)        ' 右
+            Call ClickFunction(p_row + 1, p_clm - 1)    ' 左下
+            Call ClickFunction(p_row + 1, p_clm)        ' 下
+            Call ClickFunction(p_row + 1, p_clm + 1)    ' 右下
+            Exit Sub
+        Else
+            ' 数字のセルの場合、処理終了
+            Exit Sub
+        End If
+    Else
+        Exit Sub
+    End If
+End Sub
+
+' === イベント ===
+
+Private Sub Worksheet_SelectionChange(ByVal Target As Range)
+
+    ' 複数セル選択時 処理終了
+    If Target.Count > 1 Then Exit Sub
+    
+    ' 描画停止
+    Application.ScreenUpdating = False
+    
+    ' リスタートボタン押下時
+    If Target.Address = "$M$2" Then
+        Call ReStart
+    End If
+
+    ' 選択セルが範囲内の場合
+    If (Target.column >= 2 And Target.column <= 11) And _
+       (Target.row >= 2 And Target.row <= 11) Then
+        
+        ' 爆弾のセルを引いた場合
+        If Target.Value = "●" Then
+            ' セルの内容を表示
+            Target.Interior.Color = RGB(255, 255, 255)
+            Target.NumberFormatLocal = ""
+            Target.Font.Color = RGB(255, 0, 0)
+            
+            ' 他の爆弾の表示処理
+            Dim idx_row As Integer      ' 行インクリメント
+            Dim idx_clm As Integer      ' 列インクリメント
+            
+            For idx_row = 2 To 11
+                For idx_clm = 2 To 11
+                    ' セルが爆弾の場合
+                    If Cells(idx_row, idx_clm).Value = "●" Then
+                        Cells(idx_row, idx_clm).NumberFormatLocal = ""
+                    End If
+                Next        'idx_clm
+            Next            'idx_row
+            
+        Else
+            ' それ以外
+            Call ClickFunction(Target.row, Target.column)
+        End If
+    End If
+    
+    ' 描画再開
+    Application.ScreenUpdating = True
+
+End Sub
